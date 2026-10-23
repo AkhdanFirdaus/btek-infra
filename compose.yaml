@@ -1,8 +1,17 @@
 name: btek-infra
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 services:
   caddy:
     image: caddy:2.11.7-alpine
     restart: unless-stopped
+    mem_limit: 256m
+    logging: *default-logging
+    security_opt:
+      - "no-new-privileges:true"
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:
       KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:?KEYCLOAK_PUBLIC_URL is required}
@@ -21,6 +30,10 @@ services:
   keycloak-db:
     image: postgres:17.11-alpine3.24
     restart: unless-stopped
+    mem_limit: 1g
+    logging: *default-logging
+    security_opt:
+      - "no-new-privileges:true"
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:?POSTGRES_ADMIN_USER is required}
@@ -37,6 +50,10 @@ services:
     image: quay.io/keycloak/keycloak:26.8.1
     command: ["start", "--http-enabled=true", "--proxy-headers=xforwarded"]
     restart: unless-stopped
+    mem_limit: 2g
+    logging: *default-logging
+    security_opt:
+      - "no-new-privileges:true"
     environment:
       KC_DB: postgres
       KC_DB_URL_HOST: keycloak-db
@@ -46,6 +63,7 @@ services:
       KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:?KEYCLOAK_PUBLIC_URL is required}
       KC_HOSTNAME_STRICT: "true"
       KC_HEALTH_ENABLED: "true"
+      JAVA_OPTS_KC_HEAP: "-XX:MaxRAMPercentage=65 -XX:InitialRAMPercentage=25"
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
     depends_on:
@@ -62,6 +80,10 @@ services:
   rustfs:
     image: rustfs/rustfs:1.0.3
     restart: unless-stopped
+    mem_limit: 1g
+    logging: *default-logging
+    security_opt:
+      - "no-new-privileges:true"
     environment:
       RUSTFS_ADDRESS: 0.0.0.0:9000
       RUSTFS_CONSOLE_ENABLE: "true"

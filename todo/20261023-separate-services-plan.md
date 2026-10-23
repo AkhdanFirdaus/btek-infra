@@ -8,7 +8,7 @@ Dasar: [20261023-separate-services.md](./20261023-separate-services.md), konfigu
 - Keycloak dan RustFS infra dimulai **baru/kosong**. Tidak ada migrasi database Keycloak, user, bucket, atau objek RustFS lama. Database aplikasi tetap mengikuti kebutuhan deployment `btek-docs`; rencana ini tidak mengasumsikan isinya kosong.
 - Definisi realm `btek`, client `btek-docs-app`, role, redirect URI, web origin, dan secret client tetap dimiliki `btek-docs`. **Setelah infra dan app berhasil di-deploy**, jalankan langkah provisioning untuk mengirim konfigurasi tersebut ke Keycloak infra. Provisioning harus aman dijalankan ulang, hanya mengubah resource yang dimiliki `btek-docs`, dan tidak menghapus client aplikasi lain.
 - Hostname publik tetap menjadi issuer OIDC kanonis. App memakai endpoint internal pada Docker network bersama untuk komunikasi server-ke-server. Hanya Caddy membuka port publik 80/443; database tetap pada network privat.
-- Semua repository deployment (termasuk btek-infra dan btek-docs) memakai akun deployment bersama; tiap repository mendapat direktori sendiri di /opt/apps/<repository>. Alur lokal harus tetap jelas sebelum service lama dihapus dari Compose aplikasi.
+- Akun deployment bersama deploy-apps mengelola stack infra di /opt/infra dan aplikasi di /opt/apps/<repository>. Alur lokal harus tetap jelas sebelum service lama dihapus dari Compose aplikasi.
 
 ## Temuan repository
 
@@ -25,7 +25,8 @@ Dasar: [20261023-separate-services.md](./20261023-separate-services.md), konfigu
 - [x] Tetapkan bahwa Keycloak/RustFS infra dimulai kosong; tidak ada migrasi data Keycloak/RustFS lama.
 - [x] Periksa Docker lokal WSL: Docker Engine 29.4.3, Compose v5.1.3; Compose project btek-docs-app memakai volume btek-docs-app_btek_docs_postgres dan btek-docs-app_btek_docs_rustfs; network saat ini btek-docs-app_default, belum ada network bersama. Keycloak 26.8.1, RustFS 1.0.3, dan PostgreSQL 17.11 terdeteksi. App dan worker lokal berstatus exited (137) saat pemeriksaan; migrator selesai, DB/Keycloak/RustFS sehat.
 - [x] Catat kapasitas mesin WSL lokal: sekitar 16 GB memori Docker dan 823 GB disk bebas pada filesystem proyek. Angka ini hanya untuk lingkungan lokal, bukan server produksi.
-- [x] Tetapkan proposal awal deployment path /opt/infra untuk stack infra dan /opt/apps/btek-docs untuk stack app; nama network bersama yang diusulkan proxy.
+- [x] Tetapkan deployment path /opt/infra untuk stack infra dan /opt/apps/btek-docs untuk stack app; aplikasi lain memakai /opt/apps/<repository>, akun deployment bersama deploy-apps, dan nama network bersama proxy.
+- [ ] Pastikan /opt/infra dimiliki atau dapat ditulisi deploy-apps untuk workflow infra. Pastikan /opt/apps dapat ditulisi deploy-apps agar workflow dapat membuat direktori aplikasi baru.
 - [x] Inventaris secret infra tanpa membaca nilainya: password admin dan user DB Keycloak, password admin bootstrap Keycloak, access key bootstrap RustFS, SSH deploy key, dan host key.
 - [x] User mengonfirmasi DNS dan host produksi sudah sesuai; domain publik menggunakan *.bteklabs.com tanpa embel-embel libra. Nama layanan infra: sso.bteklabs.com, storage.bteklabs.com, dan s3.bteklabs.com.
 - [x] Tetapkan GitHub Environment production pada repository btek-infra sebagai tempat secret dan variable deployment infra; pemilik operasionalnya maintainer repository/environment. Jangan simpan secret di Git.
@@ -38,6 +39,7 @@ Dasar: [20261023-separate-services.md](./20261023-separate-services.md), konfigu
 - [x] Pindahkan konfigurasi Caddy agar merutekan tiga hostname layanan infra pada network bersama. Hanya Caddy membuka 80/443.
 - [x] Jalankan Keycloak produksi tanpa import realm `btek` saat startup. Siapkan endpoint/admin credential yang diperlukan oleh langkah provisioning dari `btek-docs`.
 - [x] Siapkan service RustFS baru/kosong dengan volume persisten, image dipin, dan health check; dokumentasikan pembuatan bucket serta aksesnya.
+- [x] Terapkan batas memori per service (Caddy 256 MiB, PostgreSQL 1 GiB, Keycloak 2 GiB dengan heap JVM dibatasi, RustFS 1 GiB), rotasi log 10 MiB ×3, dan `no-new-privileges` pada seluruh service infra.
 - [ ] Setelah deployment, buat bucket `btek-docs` dan IAM user/service account app dengan policy terbatas. Ini tindakan operasional maintainer.
 - [x] Buat `.env.example`, dokumentasi bootstrap, health check, backup/restore untuk data infra yang **dibuat setelah deployment**, serta jalur deploy infra independen dari release app.
 
@@ -71,8 +73,3 @@ Dasar: [20261023-separate-services.md](./20261023-separate-services.md), konfigu
 ## Gate selesai
 
 Rilis `btek-docs` tidak mengubah siklus hidup service infra; Keycloak/RustFS berdiri sendiri; konfigurasi realm app berhasil di-push setelah kedua deployment; login dan upload baru berfungsi; dan backup untuk data yang mulai terbentuk setelah deployment tersedia.
-
-
-
-
-
