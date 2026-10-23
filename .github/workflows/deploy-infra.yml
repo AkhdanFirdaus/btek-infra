@@ -1,0 +1,59 @@
+name: Deploy infrastructure
+on:
+  workflow_dispatch:
+  push:
+    tags: ["infra-v*"]
+permissions:
+  contents: read
+concurrency:
+  group: production-infrastructure
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy independent infra stack
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+          APP_PUBLIC_URL: ${{ vars.APP_PUBLIC_URL }}
+          KEYCLOAK_PUBLIC_URL: ${{ vars.KEYCLOAK_PUBLIC_URL }}
+          RUSTFS_S3_PUBLIC_URL: ${{ vars.RUSTFS_S3_PUBLIC_URL }}
+          RUSTFS_CONSOLE_PUBLIC_URL: ${{ vars.RUSTFS_CONSOLE_PUBLIC_URL }}
+          POSTGRES_ADMIN_USER: ${{ vars.POSTGRES_ADMIN_USER }}
+          KEYCLOAK_ADMIN_USERNAME: ${{ vars.KEYCLOAK_ADMIN_USERNAME }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+          KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+          RUSTFS_ACCESS_KEY_ID: ${{ secrets.RUSTFS_ACCESS_KEY_ID }}
+          RUSTFS_SECRET_ACCESS_KEY: ${{ secrets.RUSTFS_SECRET_ACCESS_KEY }}
+        run: |
+          set -eu
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH DEPLOY_PORT APP_PUBLIC_URL KEYCLOAK_PUBLIC_URL RUSTFS_S3_PUBLIC_URL RUSTFS_CONSOLE_PUBLIC_URL POSTGRES_ADMIN_USER KEYCLOAK_ADMIN_USERNAME DEPLOY_SSH_PRIVATE_KEY DEPLOY_KNOWN_HOSTS POSTGRES_ADMIN_PASSWORD KEYCLOAK_ADMIN_PASSWORD RUSTFS_ACCESS_KEY_ID RUSTFS_SECRET_ACCESS_KEY; do
+            test -n "${!name}" || { echo "Missing production input: $name" >&2; exit 1; }
+          done
+          case "$DEPLOY_PATH" in /*) ;; *) echo "DEPLOY_PATH must be absolute" >&2; exit 1 ;; esac
+          case "$DEPLOY_PORT" in *[!0-9]*|"") echo "DEPLOY_PORT must be numeric" >&2; exit 1 ;; esac
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+          python3 - <<'PY'
+          import json, os
+          names = ["APP_PUBLIC_URL", "KEYCLOAK_PUBLIC_URL", "RUSTFS_S3_PUBLIC_URL", "RUSTFS_CONSOLE_PUBLIC_URL", "POSTGRES_ADMIN_USER", "POSTGRES_ADMIN_PASSWORD", "KEYCLOAK_ADMIN_USERNAME", "KEYCLOAK_ADMIN_PASSWORD"]
+          names += [("RUSTFS_ROOT_ACCESS_KEY", "RUSTFS_ACCESS_KEY_ID"), ("RUSTFS_ROOT_SECRET_KEY", "RUSTFS_SECRET_ACCESS_KEY")]
+          with open(".env.production", "w", encoding="utf-8") as env_file:
+              for item in names:
+                  target, source = item if isinstance(item, tuple) else (item, item)
+                  env_file.write(f"{target}={json.dumps(os.environ[source])}\n")
+          PY
+          chmod 600 .env.production
+          ssh -i "$HOME/.ssh/id_ed25519" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH/scripts'"
+          scp -i "$HOME/.ssh/id_ed25519" -P "$DEPLOY_PORT" compose.yaml Caddyfile .env.production "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+          scp -i "$HOME/.ssh/id_ed25519" -P "$DEPLOY_PORT" scripts/backup.sh "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/scripts/"
+          ssh -i "$HOME/.ssh/id_ed25519" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && chmod 600 .env.production && chmod 700 scripts/backup.sh && (docker network inspect proxy >/dev/null 2>&1 || docker network create proxy) && docker compose --env-file .env.production -p btek-infra up -d --wait"

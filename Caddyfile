@@ -1,0 +1,19 @@
+{$APP_PUBLIC_URL} {
+  encode zstd gzip
+  reverse_proxy btek-docs-app:3000
+}
+
+{$KEYCLOAK_PUBLIC_URL} {
+  encode zstd gzip
+  reverse_proxy keycloak:8080
+}
+
+{$RUSTFS_S3_PUBLIC_URL} {
+  encode zstd gzip
+  reverse_proxy rustfs:9000
+}
+
+{$RUSTFS_CONSOLE_PUBLIC_URL} {
+  encode zstd gzip
+  reverse_proxy rustfs:9001
+}

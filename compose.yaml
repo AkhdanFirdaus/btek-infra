@@ -1,0 +1,88 @@
+name: btek-infra
+services:
+  caddy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:?APP_PUBLIC_URL is required}
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:?KEYCLOAK_PUBLIC_URL is required}
+      RUSTFS_S3_PUBLIC_URL: ${RUSTFS_S3_PUBLIC_URL:?RUSTFS_S3_PUBLIC_URL is required}
+      RUSTFS_CONSOLE_PUBLIC_URL: ${RUSTFS_CONSOLE_PUBLIC_URL:?RUSTFS_CONSOLE_PUBLIC_URL is required}
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config"]
+    networks: [proxy]
+    depends_on:
+      keycloak: {condition: service_healthy}
+      rustfs: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "caddy", "validate", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  keycloak-db:
+    image: postgres:17.11-alpine3.24
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:?POSTGRES_ADMIN_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?POSTGRES_ADMIN_PASSWORD is required}
+    volumes: ["keycloak_db_data:/var/lib/postgresql/data"]
+    networks: [keycloak-db-private]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start", "--http-enabled=true", "--proxy-headers=xforwarded"]
+    restart: unless-stopped
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: ${POSTGRES_ADMIN_USER:?POSTGRES_ADMIN_USER is required}
+      KC_DB_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?POSTGRES_ADMIN_PASSWORD is required}
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:?KEYCLOAK_PUBLIC_URL is required}
+      KC_HOSTNAME_STRICT: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
+    depends_on:
+      keycloak-db: {condition: service_healthy}
+    networks:
+      proxy: {aliases: [keycloak]}
+      keycloak-db-private: {}
+    healthcheck:
+      test: ["CMD-SHELL", "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9000; printf \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3; grep -q \"200 OK\" <&3'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+  rustfs:
+    image: rustfs/rustfs:1.0.3
+    restart: unless-stopped
+    environment:
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ROOT_ACCESS_KEY:?RUSTFS_ROOT_ACCESS_KEY is required}
+      RUSTFS_SECRET_KEY: ${RUSTFS_ROOT_SECRET_KEY:?RUSTFS_ROOT_SECRET_KEY is required}
+    volumes: ["rustfs_data:/data"]
+    networks:
+      proxy: {aliases: [rustfs]}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+networks:
+  proxy: {name: proxy, external: true}
+  keycloak-db-private: {internal: true}
+volumes:
+  caddy_data:
+  caddy_config:
+  keycloak_db_data:
+  rustfs_data:
