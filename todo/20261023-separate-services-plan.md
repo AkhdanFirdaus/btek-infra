@@ -35,7 +35,7 @@ Dasar: [20261023-separate-services.md](./20261023-separate-services.md), konfigu
 ### 1. Bangun btek-infra
 
 - [x] Buat Compose terpisah untuk Caddy, Keycloak + PostgreSQL khususnya, dan RustFS dengan image dipin. Buat Docker network eksternal bersama serta network privat database.
-- [x] Pindahkan konfigurasi Caddy agar merutekan empat hostname ke service infra dan app pada network bersama. Hanya Caddy membuka 80/443.
+- [x] Pindahkan konfigurasi Caddy agar merutekan tiga hostname layanan infra pada network bersama. Hanya Caddy membuka 80/443.
 - [x] Jalankan Keycloak produksi tanpa import realm `btek` saat startup. Siapkan endpoint/admin credential yang diperlukan oleh langkah provisioning dari `btek-docs`.
 - [x] Siapkan service RustFS baru/kosong dengan volume persisten, image dipin, dan health check; dokumentasikan pembuatan bucket serta aksesnya.
 - [ ] Setelah deployment, buat bucket `btek-docs` dan IAM user/service account app dengan policy terbatas. Ini tindakan operasional maintainer.
@@ -45,6 +45,7 @@ Dasar: [20261023-separate-services.md](./20261023-separate-services.md), konfigu
 
 - [ ] Ubah Compose produksi agar hanya mengelola app, worker, migrator, dan PostgreSQL aplikasi. Hapus `depends_on` lintas Compose dan gunakan kesiapan/retry koneksi yang sesuai.
 - [ ] Arahkan `KEYCLOAK_INTERNAL_URL` dan `RUSTFS_ENDPOINT` ke service infra pada network bersama. Pertahankan `KEYCLOAK_PUBLIC_URL` sebagai issuer HTTPS kanonis dan callback app pada hostname publik.
+- [ ] Tambahkan route hostname aplikasi ke Caddy ingress setelah app domain ditetapkan; definisi hostname dan workflow deploy app tetap dimiliki repo btek-docs.
 - [ ] Untuk instalasi PostgreSQL baru, ubah skrip init agar hanya membuat database/role aplikasi. Tentukan penanganan instance lama secara terpisah bila memang digunakan.
 - [ ] Pertahankan konfigurasi realm/client/role milik app di repo `btek-docs`. Buat perintah provisioning pasca-deploy yang membuat atau memperbarui hanya konfigurasi itu di Keycloak infra, aman diulang, tidak membawa user lama, dan gagal jelas bila credential/admin API tidak tersedia.
 - [ ] Ubah workflow rilis app agar hanya deploy app dan menjalankan provisioning realm setelah infra **dan** app siap. Pisahkan secret infra dari workflow app; berikan hanya hak administrasi Keycloak yang diperlukan untuk provisioning.

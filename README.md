@@ -4,11 +4,11 @@ Infrastructure ini memiliki siklus deploy sendiri: Caddy, Keycloak dengan Postgr
 
 ## Konfigurasi dan deploy
 
-Atur `APP_PUBLIC_URL` ke hostname app yang dipilih. Host infra adalah `https://sso.bteklabs.com`, `https://s3.bteklabs.com`, dan `https://storage.bteklabs.com`. Contoh `docs.bteklabs.com` di `.env.example` hanya nilai contoh.
+Host infra adalah `https://sso.bteklabs.com`, `https://s3.bteklabs.com`, dan `https://storage.bteklabs.com`. Hostname aplikasi dimiliki repo btek-docs.
 
-Workflow `.github/workflows/deploy-infra.yml` memakai GitHub Environment `production`, berjalan manual atau dari tag `infra-v*`, dan hanya mengubah stack infra. Atur `DEPLOY_PATH=/opt/infra`. Tambahkan variable `APP_PUBLIC_URL` di Environment `production`; workflow memakai variable dan secret berikut:
+Workflow `.github/workflows/deploy-infra.yml` memakai GitHub Environment `production`, berjalan manual atau dari tag `infra-v*`, dan hanya mengubah stack infra. Atur `DEPLOY_PATH=/opt/infra`. Workflow memakai variable dan secret berikut:
 
-Variables: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`, `DEPLOY_PORT`, `APP_PUBLIC_URL`, `KEYCLOAK_PUBLIC_URL`, `RUSTFS_S3_PUBLIC_URL`, `RUSTFS_CONSOLE_PUBLIC_URL`, `POSTGRES_ADMIN_USER`, `KEYCLOAK_ADMIN_USERNAME`.
+Variables: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`, `DEPLOY_PORT`, `KEYCLOAK_PUBLIC_URL`, `RUSTFS_S3_PUBLIC_URL`, `RUSTFS_CONSOLE_PUBLIC_URL`, `POSTGRES_ADMIN_USER`, `KEYCLOAK_ADMIN_USERNAME`.
 
 Secrets: `DEPLOY_SSH_PRIVATE_KEY`, `DEPLOY_KNOWN_HOSTS`, `POSTGRES_ADMIN_PASSWORD`, `KEYCLOAK_ADMIN_PASSWORD`, `RUSTFS_ACCESS_KEY_ID`, `RUSTFS_SECRET_ACCESS_KEY`. Dua secret RustFS dipetakan menjadi root credential saat bootstrap. Jangan bagikan root credential ke btek-docs.
 
@@ -20,7 +20,7 @@ docker compose --env-file .env.production -p btek-infra up -d --wait
 docker compose --env-file .env.production -p btek-infra ps
 ```
 
-Hanya Caddy mempublikasikan port host 80/443. PostgreSQL tetap pada network privat. App btek-docs harus bergabung ke network `proxy` dengan alias `btek-docs-app` sebelum route app aktif.
+Hanya Caddy mempublikasikan port host 80/443. PostgreSQL tetap pada network privat. Route hostname aplikasi akan diintegrasikan dari repo btek-docs pada tahap 2. Repo itu bergabung ke network `proxy` dengan alias `btek-docs-app`.
 
 ## RustFS bucket dan akses app
 
