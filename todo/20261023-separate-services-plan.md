@@ -49,8 +49,8 @@ Dasar: [20261023-separate-services.md](./20261023-separate-services.md), konfigu
 - [x] Arahkan KEYCLOAK_INTERNAL_URL dan RUSTFS_ENDPOINT melalui variable production ke service infra pada network bersama proxy. Pertahankan KEYCLOAK_PUBLIC_URL sebagai issuer HTTPS kanonis dan APP_PUBLIC_URL sebagai origin callback app.
 - [x] Tambahkan route `desk.bteklabs.com` pada Caddy ingress ke alias `btek-docs-app:3000`; Compose produksi app mendaftarkan alias unik pada network `proxy`, dan workflow infra memuat ulang Caddy setelah deploy.
 - [x] Untuk PostgreSQL pada stack produksi baru, gunakan postgres/init/001-provision-app-database.sh yang hanya membuat database/role aplikasi. Skrip init Compose lokal tetap mendukung Keycloak lokal; instance/volume yang sudah ada tidak dihapus atau diubah.
-- [ ] Pertahankan konfigurasi realm/client/role milik app di repo `btek-docs`. Buat perintah provisioning pasca-deploy yang membuat atau memperbarui hanya konfigurasi itu di Keycloak infra, aman diulang, tidak membawa user lama, dan gagal jelas bila credential/admin API tidak tersedia.
-- [ ] Ubah workflow rilis app agar hanya deploy app dan menjalankan provisioning realm setelah infra dan app siap. Workflow memiliki preflight validasi production sebelum build dan job build_image/deploy yang dapat diulang terpisah; provisioning realm pasca-deploy masih perlu dibuat.
+- [x] Pertahankan konfigurasi realm/client/role milik app di repo `btek-docs`. Buat perintah provisioning pasca-deploy yang membuat atau memperbarui hanya konfigurasi itu di Keycloak infra, aman diulang, tidak membawa user lama, dan gagal jelas bila credential/admin API tidak tersedia.
+- [x] Ubah workflow rilis app agar hanya deploy app dan menjalankan provisioning realm setelah infra dan app siap. Workflow memiliki preflight validasi production sebelum build dan job build_image/deploy yang dapat diulang terpisah; provisioning realm berjalan otomatis setelah app siap dan aman dijalankan ulang secara manual.
 - [x] Jalankan pemeriksaan private key SSH dan known_hosts pada preflight menggunakan `ssh-keygen` di Bash; workflow menormalkan CRLF saat menulis private key.
 - [ ] Sesuaikan backup/restore aplikasi untuk RustFS infra; pindahkan backup/restore Keycloak ke dokumentasi/operasi infra. README btek-docs sudah menjelaskan batas kepemilikan produksi; penyesuaian backup/restore dan contoh env masih perlu dituntaskan.
 
@@ -65,7 +65,7 @@ Dasar: [20261023-separate-services.md](./20261023-separate-services.md), konfigu
 ### 4. Deploy produksi dan penerimaan
 
 - [ ] Deploy infra lebih dulu dan verifikasi Caddy, Keycloak, serta RustFS; cek hostname infra sso.bteklabs.com, storage.bteklabs.com, dan s3.bteklabs.com. Hostname app diverifikasi setelah btek-docs tersambung pada langkah berikutnya.
-- [ ] Deploy `btek-docs` dengan endpoint infra, kemudian jalankan provisioning realm dari repo app.
+- [x] Deploy `btek-docs` dengan endpoint infra, kemudian jalankan provisioning realm dari repo app.
 - [ ] Buat akun uji baru dan verifikasi login, role, callback/logout, unggah/unduh file baru, worker, readiness, dan sertifikat HTTPS sebelum membuka akses pengguna.
 - [ ] Amati log dan health kedua stack. Jika gate gagal, hentikan akses app, perbaiki konfigurasi/deployment, lalu ulangi provisioning yang aman dijalankan ulang. Karena tidak ada data Keycloak/RustFS lama yang dimigrasikan, rollback tidak memerlukan restore data lama.
 - [ ] Setelah penerimaan, hapus definisi Keycloak/RustFS/Caddy lama serta secret yang tidak lagi dipakai dari deployment app. Jangan gunakan `docker compose down -v` untuk pembersihan.
@@ -74,3 +74,9 @@ Dasar: [20261023-separate-services.md](./20261023-separate-services.md), konfigu
 ## Gate selesai
 
 Rilis `btek-docs` tidak mengubah siklus hidup service infra; Keycloak/RustFS berdiri sendiri; konfigurasi realm app berhasil di-push setelah kedua deployment; login dan upload baru berfungsi; dan backup untuk data yang mulai terbentuk setelah deployment tersedia.
+
+
+### Catatan deployment produksi (2026-10-27)
+
+- Provisioning realm `btek` berhasil dijalankan dari `/opt/apps/btek-docs` dua kali; pengulangan memperbarui client `btek-docs-app` dan role `btek-docs-user` tanpa menghapus user atau client lain.
+- Keycloak discovery merespons HTTP 200 dan `desk.bteklabs.com` merespons HTTP 302 ke `https://docs.bteklabs.com/auth/login`; container app sehat. Environment produksi masih perlu memakai `APP_PUBLIC_URL=https://desk.bteklabs.com` sebelum uji login/callback diterima.
