@@ -12,3 +12,8 @@
   encode zstd gzip
   reverse_proxy rustfs:9001
 }
+
+desk.bteklabs.com {
+  encode zstd gzip
+  reverse_proxy btek-docs-app:3000
+}

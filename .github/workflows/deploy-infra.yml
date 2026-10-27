@@ -55,4 +55,4 @@ jobs:
           ssh -i "$HOME/.ssh/id_ed25519" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH/scripts'"
           scp -i "$HOME/.ssh/id_ed25519" -P "$DEPLOY_PORT" compose.yaml Caddyfile .env.production "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
           scp -i "$HOME/.ssh/id_ed25519" -P "$DEPLOY_PORT" scripts/backup.sh "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/scripts/"
-          ssh -i "$HOME/.ssh/id_ed25519" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && chmod 600 .env.production && chmod 700 scripts/backup.sh && (docker network inspect proxy >/dev/null 2>&1 || docker network create proxy) && docker compose --env-file .env.production -p btek-infra up -d --wait"
+          ssh -i "$HOME/.ssh/id_ed25519" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "cd '$DEPLOY_PATH' && chmod 600 .env.production && chmod 700 scripts/backup.sh && (docker network inspect proxy >/dev/null 2>&1 || docker network create proxy) && docker compose --env-file .env.production -p btek-infra up -d --wait && docker compose --env-file .env.production -p btek-infra exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile"

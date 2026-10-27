@@ -4,7 +4,7 @@ Infrastructure ini memiliki siklus deploy sendiri: Caddy, Keycloak dengan Postgr
 
 ## Konfigurasi dan deploy
 
-Host infra adalah `https://sso.bteklabs.com`, `https://s3.bteklabs.com`, dan `https://storage.bteklabs.com`. Hostname aplikasi dimiliki repo btek-docs.
+Host infra adalah `https://sso.bteklabs.com`, `https://s3.bteklabs.com`, dan `https://storage.bteklabs.com`. Hostname aplikasi `https://desk.bteklabs.com` dirutekan Caddy ke alias `btek-docs-app:3000` pada network bersama `proxy`; nilai `APP_PUBLIC_URL` tetap dikonfigurasi oleh repo btek-docs.
 
 Workflow `.github/workflows/deploy-infra.yml` memakai GitHub Environment `production`, berjalan manual atau dari tag `infra-v*`, dan hanya mengubah stack infra. Atur `DEPLOY_PATH=/opt/infra`. Workflow memakai variable dan secret berikut:
 
@@ -20,7 +20,7 @@ docker compose --env-file .env.production -p btek-infra up -d --wait
 docker compose --env-file .env.production -p btek-infra ps
 ```
 
-Hanya Caddy mempublikasikan port host 80/443. PostgreSQL tetap pada network privat. Route hostname aplikasi akan diintegrasikan dari repo btek-docs pada tahap 2. Repo itu bergabung ke network `proxy` dengan alias `btek-docs-app`.
+Hanya Caddy mempublikasikan port host 80/443. PostgreSQL tetap pada network privat. Route `desk.bteklabs.com` dilayani Caddy dari repo infra. Compose produksi btek-docs bergabung ke network `proxy` memakai alias unik `btek-docs-app`; workflow infra memuat ulang konfigurasi Caddy setelah deploy.
 
 ## RustFS bucket dan akses app
 
